@@ -1,0 +1,43 @@
+services:
+  # Сервис базы данных
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mysecurepassword
+      POSTGRES_DB: mydatabase
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydatabase"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Сервис вашего Spring Boot приложения
+  faangineer-backend:
+    build: .
+    container_name: faangineer_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Настройки подключения к БД (переопределяют application.properties / application.yml)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mydatabase
+      SPRING_DATASOURCE_USERNAME: myuser
+      SPRING_DATASOURCE_PASSWORD: mysecurepassword
+      # Настройки Flyway (включение миграций при старте)
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy # Ждет, пока pg_isready вернет успешный статус
+
+volumes:
+  pgdata:
+    driver: local
